@@ -4,35 +4,44 @@ import uuid
 from enum import Enum
 
 from . import exceptions
+from .utils import memoized_property
 
 _RE_HBML_COMMENT = re.compile(r'^/-')
 _RE_TAG = re.compile(
-    r'^(((%[a-z0-9]+)|(\.[a-zA-Z0-9_-]+)|(#[a-zA-Z0-9_-]+))+)'
+    r'^((%[a-z0-9]+)|(\.[a-zA-Z0-9_-]+)|(#[a-zA-Z0-9_-]+))+'
 )
 _RE_TAG_NAME = re.compile(r'%([a-z0-9]+)')
+_RE_TAG_CLASS_NAME = re.compile(r'\.([a-z0-9]+)')
 
 LineTypes = Enum(
     'LineTypes',
-    'TAG TEXT EXPRESSION COMMENT',
+    'TAG TEXT EXPRESSION COMMENT EMPTY',
     module=__name__
 )
 
 
 class SourceLine(object):
-    '''one line of source'''
+    '''a line of source'''
     def __init__(self, source):
         self.__source = source
 
     def __repr__(self):
-        return '<hbml.compiler.SourceLine(%s)>' % self.__source
+        return '<%s.%s(%s)>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            self.__source
+        )
 
-    @property
+    @memoized_property
     def type(self):
         if _RE_HBML_COMMENT.match(self.__source):
             return LineTypes.COMMENT
 
         if _RE_TAG.match(self.__source):
             return LineTypes.TAG
+
+        if not self.__source:
+            return LineTypes.EMPTY
 
         raise exceptions.CompileError('unknow type: %s' % repr(self))
 
@@ -48,10 +57,45 @@ class SourceLine(object):
 
         return SourceLine(self.__source[width:])
 
-    @property
+    def compile(self, block, env):
+        if self.type == LineTypes.TAG:
+            return Tag(self.__source).compile(block, env)
+
+        raise exceptions.CompileError(
+            'dont know how to compile type: %s' % repr(self)
+        )
+
+
+class LineItemBase(object):
+    pass
+
+
+class Tag(LineItemBase):
+    _DEFAULT_TAG_NAME = 'div'
+
+    def __init__(self, source):
+        self.__source = source
+
+    @memoized_property
     def tag_name(self):
-        match = _RE_TAG_NAME.match(self.__source)
-        return match.group(1)
+        match = _RE_TAG_NAME.match(self.brief)
+        if match:
+            return match.group(1)
+        else:
+            return self._DEFAULT_TAG_NAME
+
+    @memoized_property
+    def class_names(self):
+        matches = _RE_TAG_CLASS_NAME.finditer(self.brief)
+        if matches:
+            return [m.group(1) for m in matches]
+        else:
+            return []
+
+    @memoized_property
+    def brief(self):
+        match = _RE_TAG.match(self.__source)
+        return match.group(0)
 
     def compile(self, block, env):
         env.writeline("buffer.write('<%s>')" % self.tag_name)
@@ -80,7 +124,7 @@ class Block(object):
             indent_width = env.options['indent_width']
             for s in self.__source_lines:
                 if s.is_header_line():
-                    if s.type == LineTypes.COMMENT:
+                    if s.type in (LineTypes.COMMENT, LineTypes.EMPTY):
                         continue
 
                     _header = s
