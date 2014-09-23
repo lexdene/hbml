@@ -23,6 +23,12 @@ class TagClassNamesTestCase(unittest.TestCase):
             ['hello']
         )
 
+    def testOnlyClassName(self):
+        self.assertEqual(
+            Tag('.hello').class_names,
+            ['hello']
+        )
+
     def testMultiClassNames(self):
         self.assertEqual(
             Tag('%div.hello.goodbye').class_names,
