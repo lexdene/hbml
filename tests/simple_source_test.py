@@ -11,3 +11,13 @@ class SimpleSourceTestCase(unittest.TestCase):
                 "  %h1"
             ))
         )
+
+
+class TagAttrsTestCase(unittest.TestCase):
+    def testSimpleAttr(self):
+        self.assertEqual(
+            '''<div id="yoyo" class="hello goodbye"></div>''',
+            hbml.compile((
+                "%div#yoyo.hello.goodbye"
+            ))
+        )

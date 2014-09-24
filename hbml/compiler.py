@@ -106,8 +106,28 @@ class Tag(LineItemBase):
         match = _RE_TAG.match(self.__source)
         return match.group(0)
 
+    @memoized_property
+    def attrs(self):
+        result = []
+
+        if self.id:
+            result.append(('id', '"%s"' % self.id))
+
+        if self.class_names:
+            result.append(('class', '"%s"' % ' '.join(self.class_names)))
+
+        return result
+
     def compile(self, block, env):
-        env.writeline("buffer.write('<%s>')" % self.tag_name)
+        attrs = self.attrs
+        if attrs:
+            env.writeline("buffer.write('<%s')" % self.tag_name)
+            for key, val in attrs:
+                env.writeline("buffer.write(' %s=%s')" % (key, val))
+            env.writeline("buffer.write('>')")
+        else:
+            env.writeline("buffer.write('<%s>')" % self.tag_name)
+
         block.compile(env)
         env.writeline("buffer.write('</%s>')" % self.tag_name)
 
