@@ -12,6 +12,7 @@ _RE_TAG = re.compile(
 )
 _RE_TAG_NAME = re.compile(r'%([a-z0-9]+)')
 _RE_TAG_CLASS_NAME = re.compile(r'\.([a-z0-9]+)')
+_RE_TAG_ID = re.compile(r'#([a-z0-9]+)')
 
 LineTypes = Enum(
     'LineTypes',
@@ -78,7 +79,7 @@ class Tag(LineItemBase):
 
     @memoized_property
     def tag_name(self):
-        match = _RE_TAG_NAME.match(self.brief)
+        match = _RE_TAG_NAME.search(self.brief)
         if match:
             return match.group(1)
         else:
@@ -91,6 +92,14 @@ class Tag(LineItemBase):
             return [m.group(1) for m in matches]
         else:
             return []
+
+    @memoized_property
+    def id(self):
+        match = _RE_TAG_ID.search(self.brief)
+        if match:
+            return match.group(1)
+        else:
+            return None
 
     @memoized_property
     def brief(self):

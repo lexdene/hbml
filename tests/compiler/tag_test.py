@@ -40,3 +40,23 @@ class TagClassNamesTestCase(unittest.TestCase):
             Tag('%div').class_names,
             []
         )
+
+
+class TagIdTestCase(unittest.TestCase):
+    def testTagId(self):
+        self.assertEqual(
+            Tag('%div#hello').id,
+            'hello'
+        )
+
+    def testOnlyTagId(self):
+        self.assertEqual(
+            Tag('#hello').id,
+            'hello'
+        )
+
+    def testNoneTagId(self):
+        self.assertEqual(
+            Tag('%div').id,
+            None
+        )
