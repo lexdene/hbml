@@ -5,6 +5,7 @@ from enum import Enum
 
 from . import exceptions
 from .utils import memoized_property
+from .parser.tag_parser import TagParser
 
 _RE_HBML_COMMENT = re.compile(r'^/-')
 _RE_TAG = re.compile(
@@ -33,19 +34,6 @@ class SourceLine(object):
             self.__source
         )
 
-    @memoized_property
-    def type(self):
-        if _RE_HBML_COMMENT.match(self.__source):
-            return LineTypes.COMMENT
-
-        if _RE_TAG.match(self.__source):
-            return LineTypes.TAG
-
-        if not self.__source:
-            return LineTypes.EMPTY
-
-        raise exceptions.CompileError('unknow type: %s' % repr(self))
-
     def is_header_line(self):
         return not self.__source.startswith(' ')
 
@@ -59,8 +47,9 @@ class SourceLine(object):
         return SourceLine(self.__source[width:])
 
     def compile(self, block, env):
-        if self.type == LineTypes.TAG:
-            return Tag(self.__source).compile(block, env)
+        parse_result = env.tag_parser.parse(self.__source)
+        if parse_result[0] == 'tag':
+            return Tag(parse_result).compile(block, env)
 
         raise exceptions.CompileError(
             'dont know how to compile type: %s' % repr(self)
@@ -74,62 +63,44 @@ class LineItemBase(object):
 class Tag(LineItemBase):
     _DEFAULT_TAG_NAME = 'div'
 
-    def __init__(self, source):
-        self.__source = source
-
-    @memoized_property
-    def tag_name(self):
-        match = _RE_TAG_NAME.search(self.brief)
-        if match:
-            return match.group(1)
-        else:
-            return self._DEFAULT_TAG_NAME
-
-    @memoized_property
-    def class_names(self):
-        matches = _RE_TAG_CLASS_NAME.finditer(self.brief)
-        if matches:
-            return [m.group(1) for m in matches]
-        else:
-            return []
-
-    @memoized_property
-    def id(self):
-        match = _RE_TAG_ID.search(self.brief)
-        if match:
-            return match.group(1)
-        else:
-            return None
-
-    @memoized_property
-    def brief(self):
-        match = _RE_TAG.match(self.__source)
-        return match.group(0)
-
-    @memoized_property
-    def attrs(self):
-        result = []
-
-        if self.id:
-            result.append(('id', '"%s"' % self.id))
-
-        if self.class_names:
-            result.append(('class', '"%s"' % ' '.join(self.class_names)))
-
-        return result
+    def __init__(self, parse_tree):
+        self.__parse_tree = parse_tree
 
     def compile(self, block, env):
-        attrs = self.attrs
+        tag_name = self._DEFAULT_TAG_NAME
+        class_names = []
+        _id = None
+
+        attrs = []
+
+        for brief in self.__parse_tree[1][1]:
+            if '#' == brief[1]:
+                _id = brief[2]
+            elif '%' == brief[1]:
+                tag_name = brief[2]
+            elif '.' == brief[1]:
+                class_names.append(brief[2])
+
+        if _id:
+            attrs.append(('id', '"%s"' % _id))
+        if class_names:
+            attrs.append(('class', '"%s"' % ' '.join(class_names)))
+
+        tag_attrs = self.__parse_tree[2]
+        if tag_attrs:
+            for attr in tag_attrs[1]:
+                attrs.append((attr[1], attr[2][1]))
+
         if attrs:
-            env.writeline("buffer.write('<%s')" % self.tag_name)
+            env.writeline("buffer.write('<%s')" % tag_name)
             for key, val in attrs:
                 env.writeline("buffer.write(' %s=%s')" % (key, val))
             env.writeline("buffer.write('>')")
         else:
-            env.writeline("buffer.write('<%s>')" % self.tag_name)
+            env.writeline("buffer.write('<%s>')" % tag_name)
 
         block.compile(env)
-        env.writeline("buffer.write('</%s>')" % self.tag_name)
+        env.writeline("buffer.write('</%s>')" % tag_name)
 
 
 class Block(object):
@@ -153,9 +124,6 @@ class Block(object):
             indent_width = env.options['indent_width']
             for s in self.__source_lines:
                 if s.is_header_line():
-                    if s.type in (LineTypes.COMMENT, LineTypes.EMPTY):
-                        continue
-
                     _header = s
                     _sub_lines = []
                 else:
@@ -185,6 +153,10 @@ class CompileWrapper(object):
         self.options = options
         self.__buffer = None
         self.__indent_width = 0
+
+    @memoized_property
+    def tag_parser(self):
+        return TagParser()
 
     def compile(self):
         self.__indent_width = 0
