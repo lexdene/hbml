@@ -33,3 +33,11 @@ class TagAttrsTestCase(unittest.TestCase):
                 ' onclick="a = 1, b = 2, c = 3; item_clicked(a, b)")'
             ))
         )
+
+    def testExprAttr(self):
+        self.assertEqual(
+            '<div data-id="2"></div>',
+            hbml.compile(
+                '%div(data-id= 1 + 1)'
+            )
+        )

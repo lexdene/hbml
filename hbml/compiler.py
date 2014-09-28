@@ -82,9 +82,15 @@ class Tag(LineItemBase):
                 class_names.append(brief[2])
 
         if _id:
-            attrs.append(('id', '"%s"' % _id))
+            attrs.append(('id', ('string', '"%s"' % _id)))
         if class_names:
-            attrs.append(('class', '"%s"' % ' '.join(class_names)))
+            attrs.append((
+                'class',
+                (
+                    'string',
+                    '"%s"' % ' '.join(class_names)
+                )
+            ))
 
         tag_attrs = self.__parse_tree[2]
         if tag_attrs:
@@ -94,7 +100,13 @@ class Tag(LineItemBase):
         if attrs:
             env.writeline("buffer.write('<%s')" % tag_name)
             for key, val in attrs:
-                env.writeline("buffer.write(' %s=%s')" % (key, val))
+                env.writeline("buffer.write(' %s=')" % key)
+                if val[0] == 'string':
+                    env.writeline("buffer.write('%s')" % val[1])
+                else:
+                    env.writeline(
+                        '''buffer.write('"' + str(%s) + '"')''' % val[1]
+                    )
             env.writeline("buffer.write('>')")
         else:
             env.writeline("buffer.write('<%s>')" % tag_name)
@@ -167,7 +179,8 @@ class CompileWrapper(object):
         self.__block.compile(self)
         function_code = self.__buffer.getvalue()
         exec_env = {
-            '__builtins__': {}
+            '__builtins__': {},
+            'str': str,
         }
         exec(function_code, exec_env)
         return exec_env[function_name]

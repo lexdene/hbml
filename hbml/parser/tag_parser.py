@@ -98,10 +98,16 @@ def p_tag_attr_item(p):
         p[0] = ('tag_attr_item', p[2], p[4])
 
 
-def p_expr_string(p):
+def p_expr_by_string(p):
     '''
         expr : STRING
-             | unknown_expr
+    '''
+    p[0] = ('expr', ('string', p[1]))
+
+
+def p_expr_by_unknow_expr(p):
+    '''
+        expr : unknown_expr
     '''
     p[0] = ('expr', p[1])
 
