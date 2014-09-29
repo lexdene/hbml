@@ -41,3 +41,13 @@ class TagAttrsTestCase(unittest.TestCase):
                 '%div(data-id= 1 + 1)'
             )
         )
+
+    def testNoTerminateTag(self):
+        self.assertEqual(
+            '<div data-id="2" data-name="hello"><h2></h2></div>',
+            hbml.compile((
+                "%div(data-id= 1 + 1,\n"
+                "     data-name=\"hello\")\n"
+                "  %h2"
+            ))
+        )

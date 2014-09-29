@@ -34,6 +34,10 @@ class SourceLine(object):
             self.__source
         )
 
+    @property
+    def source(self):
+        return self.__source
+
     def is_header_line(self):
         return not self.__source.startswith(' ')
 
@@ -48,8 +52,13 @@ class SourceLine(object):
 
     def compile(self, block, env):
         parse_result = env.tag_parser.parse(self.__source)
+
         if parse_result[0] == 'tag':
             return Tag(parse_result).compile(block, env)
+        elif parse_result[0] == 'unterminated_tag':
+            source = self.__source + block.pop_firstline().source.strip()
+            line = SourceLine(source)
+            return line.compile(block, env)
 
         raise exceptions.CompileError(
             'dont know how to compile type: %s' % repr(self)
@@ -147,6 +156,12 @@ class Block(object):
 
         for s in self.__sub_blocks:
             s.compile(env)
+
+    def pop_firstline(self):
+        return self.__source_lines.pop(0)
+
+    def __str__(self):
+        return str(self.__source_lines)
 
 
 class BlockWithHeader(object):

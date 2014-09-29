@@ -28,6 +28,14 @@ def t_error(t):
 
 
 # yacc parsers
+def p_first_rule(p):
+    '''
+        first_rule : tag
+                   | unterminated_tag
+    '''
+    p[0] = p[1]
+
+
 def p_tag_with_brief_and_attrs(p):
     '''
         tag : tag_brief '(' tag_attrs ')'
@@ -37,16 +45,17 @@ def p_tag_with_brief_and_attrs(p):
 
 def p_tag_without_terminate(p):
     '''
-        tag : tag_brief '(' tag_attrs no_terminate
+        unterminated_tag : tag_brief '(' tag_attrs no_terminate
+                         | tag_brief '(' tag_attrs ',' no_terminate
     '''
-    p[0] = 'no terminate tag'
+    p[0] = ('unterminated_tag',)
 
 
 def p_no_terminate(p):
     '''
         no_terminate :
     '''
-    p[0] = 'no terminate'
+    p[0] = ('no terminate',)
 
 
 def p_tag_with_brief(p):
