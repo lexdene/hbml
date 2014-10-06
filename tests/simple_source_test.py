@@ -51,3 +51,31 @@ class TagAttrsTestCase(unittest.TestCase):
                 "  %h2"
             ))
         )
+
+
+class TagTextTestCase(unittest.TestCase):
+    def testSimpleText(self):
+        self.assertEqual(
+            '<div><h2>hello</h2></div>',
+            hbml.compile((
+                "%div\n"
+                "  %h2 hello"
+            ))
+        )
+
+    # TODO: test by source file and target file
+    def testTextWithAttr(self):
+        self.assertEqual(
+            (
+                '<div id="yoyoyo" class="hello goodbye"'
+                ' title="hello" '
+                'onclick="a = 1; item_clicked(a, b)">'
+                'what is up?</div>'
+            ),
+            hbml.compile((
+                '%div.hello.goodbye#yoyoyo'
+                '(title="hello", '
+                'onclick="a = 1; item_clicked(a, b)")'
+                ' what is up?'
+            ))
+        )

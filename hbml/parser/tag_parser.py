@@ -1,30 +1,139 @@
 import ply.yacc as yacc
 import ply.lex as lex
 
+_EXCLUSIVE = 'exclusive'
+_INCLUSIVE = 'inclusive'
+
+# TODO: rewrite by enum
+states = (
+    ('tagbrief', _EXCLUSIVE),
+    ('tagattrs', _EXCLUSIVE),
+    ('tagattrval', _EXCLUSIVE),
+    ('tagtail', _EXCLUSIVE),
+)
+
 # List of token names.
 tokens = (
+    'PERCENTAGE',
+    'DOT',
+    'SHARP',
+    'OPEN_BRACE',
+    'CLOSE_BRACE',
+    'COMMA',
     'KEYWORD',
     'STRING',
     'UNKNOWN',
-    'SPACE',
     'EQUAL',
+    'PLAINTEXT',
 )
 
-literals = ['%', '.', '#', '(', ')', ',']
-
 # Regular expression rules for simple tokens
-t_KEYWORD = r'[a-zA-Z_][a-zA-Z0-9_-]+'
-t_STRING = r'"[^"]*"'
-t_SPACE = r'[ ]+'
-t_EQUAL = r'[ ]*=[ ]*'
+t_tagattrs_COMMA = r'\,'
+t_tagattrs_ignore = r'[ ]+'
+t_tagattrval_STRING = r'"[^"]*"'
+t_tagtail_PLAINTEXT = r'.+'
 
 
-# Error handling rule
-def t_error(t):
+def t_tag(t):
+    r'\#|%|\.'
+    t.lexer.push_state('tagbrief')
+
+    type_map = {
+        '%': 'PERCENTAGE',
+        '.': 'DOT',
+        '#': 'SHARP',
+    }
+
+    t.type = type_map[t.value]
+    return t
+
+
+def t_space(t):
+    r'[ ]'
+
+    t.lexer.push_state('tagtail')
+
+
+def t_tagbrief_keyword(t):
+    r'[a-zA-Z_][a-zA-Z0-9_-]+'
+    t.lexer.pop_state()
+
+    t.type = 'KEYWORD'
+    return t
+
+
+def t_tagbrief_error(t):
+    raise ValueError('tagbrief error: %s' % repr(t))
+
+
+def t_INITIAL_OPEN_BRACE(t):
+    r'\('
+    t.lexer.push_state('tagattrs')
+    t.type = 'OPEN_BRACE'
+    return t
+
+
+def t_tagattrs_keyword(t):
+    r'[a-zA-Z_][a-zA-Z0-9_-]+'
+
+    t.type = 'KEYWORD'
+    return t
+
+
+def t_tagattrs_CLOSE_BRACE(t):
+    r'\)'
+
+    t.lexer.pop_state()
+
+    t.type = 'CLOSE_BRACE'
+    return t
+
+
+def t_tagattrs_EQUAL(t):
+    r'='
+    t.lexer.push_state('tagattrval')
+
+    t.type = 'EQUAL'
+    return t
+
+
+def t_tagattrs_error(t):
+    raise ValueError('t_tagattrs_error: %s' % repr(t))
+
+
+def t_tagattrval_COMMA(t):
+    r'\,'
+
+    t.lexer.pop_state()
+
+    t.type = 'COMMA'
+    return t
+
+
+def t_tagattrval_CLOSE_BRACE(t):
+    r'\)'
+
+    t.lexer.pop_state()
+    t.lexer.pop_state()
+
+    t.type = 'CLOSE_BRACE'
+    return t
+
+
+def t_tagattrval_error(t):
     t.type = 'UNKNOWN'
     t.value = t.value[0]
     t.lexer.skip(1)
     return t
+
+
+def t_tagtail_error(t):
+    raise ValueError('t_tagtail_error: %s' % repr(t))
+
+
+# Error handling rule
+def t_error(t):
+    raise ValueError('t_error: %s' % repr(t))
 
 
 # yacc parsers
@@ -38,29 +147,28 @@ def p_first_rule(p):
 
 def p_tag_with_brief_and_attrs(p):
     '''
-        tag : tag_brief '(' tag_attrs ')'
+        tag : tag_brief OPEN_BRACE tag_attrs CLOSE_BRACE
+            | tag_brief OPEN_BRACE tag_attrs CLOSE_BRACE PLAINTEXT
     '''
-    p[0] = ('tag', p[1], p[3])
-
-
-def p_tag_without_terminate(p):
-    '''
-        unterminated_tag : tag_brief '(' tag_attrs no_terminate
-                         | tag_brief '(' tag_attrs ',' no_terminate
-    '''
-    p[0] = ('unterminated_tag',)
-
-
-def p_no_terminate(p):
-    '''
-        no_terminate :
-    '''
-    p[0] = ('no terminate',)
+    if len(p) == 5:
+        p[0] = ('tag', p[1], p[3], None)
+    elif len(p) == 6:
+        p[0] = ('tag', p[1], p[3], repr(p[5]))
+    else:
+        raise ValueError('len is %d' % len(p))
 
 
 def p_tag_with_brief(p):
-    'tag : tag_brief'
-    p[0] = ('tag', p[1], None)
+    '''
+        tag : tag_brief
+            | tag_brief PLAINTEXT
+    '''
+    if len(p) == 2:
+        p[0] = ('tag', p[1], None, None)
+    elif len(p) == 3:
+        p[0] = ('tag', p[1], None, repr(p[2]))
+    else:
+        raise ValueError('len is %d' % len(p))
 
 
 def p_tag_brief(p):
@@ -75,16 +183,16 @@ def p_tag_brief_with_one_item(p):
 
 def p_tag_brief_item(p):
     '''
-        tag_brief_item : '%' KEYWORD
-                       | '.' KEYWORD
-                       | '#' KEYWORD
+        tag_brief_item : PERCENTAGE KEYWORD
+                       | DOT KEYWORD
+                       | SHARP KEYWORD
     '''
     p[0] = ('tag_brief_item', p[1], p[2])
 
 
 def p_tag_attrs(p):
     '''
-        tag_attrs : tag_attrs ',' tag_attr_item
+        tag_attrs : tag_attrs COMMA tag_attr_item
     '''
     p[0] = ('tag_attrs', p[1][1] + [p[3]])
 
@@ -99,22 +207,26 @@ def p_tag_attrs_with_one_item(p):
 def p_tag_attr_item(p):
     '''
         tag_attr_item : KEYWORD EQUAL expr
-                      | SPACE KEYWORD EQUAL expr
     '''
-    if len(p) == 4:
-        p[0] = ('tag_attr_item', p[1], p[3])
-    elif len(p) == 5:
-        p[0] = ('tag_attr_item', p[2], p[4])
+    p[0] = ('tag_attr_item', p[1], p[3])
 
 
 def p_expr_by_string(p):
     '''
         expr : STRING
+             | UNKNOWN
+             | expr STRING
+             | expr UNKNOWN
     '''
-    p[0] = ('expr', ('string', p[1]))
+    if len(p) == 2:
+        p[0] = ('expr', p[1])
+    elif len(p) == 3:
+        p[0] = ('expr', p[1][1] + p[2])
+    else:
+        raise ValueError('len is %d' % len(p))
 
 
-def p_expr_by_unknow_expr(p):
+def p_expr_by_unknown_expr(p):
     '''
         expr : unknown_expr
     '''
@@ -125,42 +237,69 @@ def p_unknown_expr(p):
     '''
         unknown_expr : UNKNOWN
                     | unknown_expr UNKNOWN
-                    | unknown_expr SPACE
     '''
     if len(p) == 2:
         p[0] = ('unknown_expr', p[1])
     elif len(p) == 3:
         p[0] = ('unknown_expr', p[1][1] + p[2])
+    else:
+        raise ValueError('len is %d' % len(p))
+
+
+def p_tag_without_terminate(p):
+    '''
+        unterminated_tag : tag_brief OPEN_BRACE tag_attrs no_terminate
+                         | tag_brief OPEN_BRACE tag_attrs COMMA no_terminate
+    '''
+    p[0] = ('unterminated_tag', p[1], p[3])
+
+
+def p_no_terminate(p):
+    '''
+        no_terminate :
+    '''
+    p[0] = ('no terminate',)
 
 
 # Error rule for syntax errors
 def p_error(p):
-    print(p.__class__)
-    print(p)
-    print("Syntax error in input!")
+    raise ValueError('p_error: %s' % repr(p))
 
 
 class TagParser(object):
     def __init__(self):
         self.__parser = yacc.yacc(debug=False, write_tables=False)
-        self.__lexer = lex.lex()
 
     def parse(self, text):
         return self.__parser.parse(
             text,
-            lexer=self.__lexer
+            lexer=lex.lex()
         )
 
 if __name__ == '__main__':
     # Build the parser
     parser = TagParser()
 
-    s = '%div.hello.goodbye#yoyoyo'
-    print(parser.parse(s))
+    # s = '%div.hello.goodbye#yoyoyo(title="hello", '
+    # 'onclick="a = 1; item_clicked(a, b)") what is up?'
+    s = (
+        '%div(data-id = 1 + 1 + "asdfasdf,()")'
+        'asdfasdf""wqwierja,lasdf'
+    )
+    print(s)
+    lexer = lex.lex()
+    lexer.input(s)
+    for tok in lexer:
+        print(
+            '%15s, %40s %3d %3d' % (
+                tok.type, repr(tok.value), tok.lineno, tok.lexpos
+            )
+        )
 
     s = (
         '%div.hello.goodbye#yoyoyo'
-        '(title="hello", onclick="a = 1,b = 2,c = 3;item_clicked(a, b)")'
+        '(title="hello", '
+        'onclick="a = 1,b = 2,c = 3;item_clicked(a, b)")'
     )
     print(parser.parse(s))
 
