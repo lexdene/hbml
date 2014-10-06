@@ -42,6 +42,22 @@ class TagAttrsTestCase(unittest.TestCase):
             )
         )
 
+    def testExprAttrWithBrace(self):
+        self.assertEqual(
+            '<div data-id="HELLO"></div>',
+            hbml.compile(
+                '%div(data-id="hello".upper())'
+            )
+        )
+
+    def testExprAttrWithMultiBraces(self):
+        self.assertEqual(
+            '<div data-id="45"></div>',
+            hbml.compile(
+                '%div(data-id= 3 * ( 1 + 2 * ( 3 + 4)))'
+            )
+        )
+
     def testNoTerminateTag(self):
         self.assertEqual(
             '<div data-id="2" data-name="hello"><h2></h2></div>',

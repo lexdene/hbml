@@ -9,6 +9,7 @@ states = (
     ('tagbrief', _EXCLUSIVE),
     ('tagattrs', _EXCLUSIVE),
     ('tagattrval', _EXCLUSIVE),
+    ('tagattrvalbrace', _EXCLUSIVE),
     ('tagtail', _EXCLUSIVE),
 )
 
@@ -110,6 +111,15 @@ def t_tagattrval_COMMA(t):
     return t
 
 
+def t_tagattrval_OPEN_BRACE(t):
+    r'\('
+
+    t.lexer.push_state('tagattrvalbrace')
+
+    t.type = 'UNKNOWN'
+    return t
+
+
 def t_tagattrval_CLOSE_BRACE(t):
     r'\)'
 
@@ -121,6 +131,31 @@ def t_tagattrval_CLOSE_BRACE(t):
 
 
 def t_tagattrval_error(t):
+    t.type = 'UNKNOWN'
+    t.value = t.value[0]
+    t.lexer.skip(1)
+    return t
+
+
+def t_tagattrvalbrace_OPEN_BRACE(t):
+    r'\('
+
+    t.lexer.push_state('tagattrvalbrace')
+
+    t.type = 'UNKNOWN'
+    return t
+
+
+def t_tagattrvalbrace_CLOSE_BRACE(t):
+    r'\)'
+
+    t.lexer.pop_state()
+
+    t.type = 'UNKNOWN'
+    return t
+
+
+def t_tagattrvalbrace_error(t):
     t.type = 'UNKNOWN'
     t.value = t.value[0]
     t.lexer.skip(1)
