@@ -213,7 +213,9 @@ class CompileWrapper(object):
 
 
 def _source_to_source_lines(source):
-    return [SourceLine(s) for s in source.split('\n')]
+    return [
+        SourceLine(s) for s in source.split('\n') if len(s) > 0
+    ]
 
 
 _DEFAULT_OPTIONS = dict(
