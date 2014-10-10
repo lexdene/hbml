@@ -21,6 +21,7 @@ tokens = (
     'OPEN_BRACE',
     'CLOSE_BRACE',
     'COMMA',
+    'VIRGULE',
     'KEYWORD',
     'STRING',
     'UNKNOWN',
@@ -29,6 +30,7 @@ tokens = (
 )
 
 # Regular expression rules for simple tokens
+t_VIRGULE = r'/'
 t_tagattrs_COMMA = r'\,'
 t_tagattrs_ignore = r'[ ]+'
 t_tagattrval_STRING = r'"[^"]*"'
@@ -50,7 +52,7 @@ def t_tag(t):
 
 
 def t_space(t):
-    r'[ ]'
+    r'\ '
 
     t.lexer.push_state('tagtail')
 
@@ -180,30 +182,54 @@ def p_first_rule(p):
     p[0] = p[1]
 
 
-def p_tag_with_brief_and_attrs(p):
+def p_tag(p):
     '''
-        tag : tag_brief OPEN_BRACE tag_attrs CLOSE_BRACE
-            | tag_brief OPEN_BRACE tag_attrs CLOSE_BRACE PLAINTEXT
+        tag : tag_brief_part tag_attrs_part tag_tail_part
     '''
-    if len(p) == 5:
-        p[0] = ('tag', p[1], p[3], None)
-    elif len(p) == 6:
-        p[0] = ('tag', p[1], p[3], repr(p[5]))
-    else:
-        raise ValueError('len is %d' % len(p))
+    p[0] = ('tag', p[1], p[2], p[3])
 
 
-def p_tag_with_brief(p):
+def p_tag_brief_part(p):
     '''
-        tag : tag_brief
-            | tag_brief PLAINTEXT
+        tag_brief_part : tag_brief
+    '''
+    p[0] = p[1]
+
+
+def p_tag_attrs_part(p):
+    '''
+        tag_attrs_part : OPEN_BRACE tag_attrs CLOSE_BRACE
+                       | empty
     '''
     if len(p) == 2:
-        p[0] = ('tag', p[1], None, None)
-    elif len(p) == 3:
-        p[0] = ('tag', p[1], None, repr(p[2]))
+        p[0] = None
+    elif len(p) == 4:
+        p[0] = p[2]
     else:
         raise ValueError('len is %d' % len(p))
+
+
+def p_tag_tail_part(p):
+    '''
+        tag_tail_part : tag_tail_text
+                      | tag_tail_closing
+                      | empty
+    '''
+    p[0] = p[1]
+
+
+def p_tag_tail_text(p):
+    '''
+        tag_tail_text : PLAINTEXT
+    '''
+    p[0] = repr(p[1])
+
+
+def p_tag_tail_closing(p):
+    '''
+        tag_tail_closing : VIRGULE
+    '''
+    p[0] = p[1]
 
 
 def p_tag_brief(p):
@@ -261,39 +287,17 @@ def p_expr_by_string(p):
         raise ValueError('len is %d' % len(p))
 
 
-def p_expr_by_unknown_expr(p):
-    '''
-        expr : unknown_expr
-    '''
-    p[0] = ('expr', p[1])
-
-
-def p_unknown_expr(p):
-    '''
-        unknown_expr : UNKNOWN
-                    | unknown_expr UNKNOWN
-    '''
-    if len(p) == 2:
-        p[0] = ('unknown_expr', p[1])
-    elif len(p) == 3:
-        p[0] = ('unknown_expr', p[1][1] + p[2])
-    else:
-        raise ValueError('len is %d' % len(p))
+def p_empty(p):
+    'empty :'
+    p[0] = None
 
 
 def p_tag_without_terminate(p):
     '''
-        unterminated_tag : tag_brief OPEN_BRACE tag_attrs no_terminate
-                         | tag_brief OPEN_BRACE tag_attrs COMMA no_terminate
+        unterminated_tag : tag_brief_part OPEN_BRACE tag_attrs empty
+                         | tag_brief_part OPEN_BRACE tag_attrs COMMA empty
     '''
     p[0] = ('unterminated_tag', p[1], p[3])
-
-
-def p_no_terminate(p):
-    '''
-        no_terminate :
-    '''
-    p[0] = ('no terminate',)
 
 
 # Error rule for syntax errors
@@ -302,8 +306,11 @@ def p_error(p):
 
 
 class TagParser(object):
-    def __init__(self):
-        self.__parser = yacc.yacc(debug=False, write_tables=False)
+    def __init__(self, debug=False):
+        if debug:
+            self.__parser = yacc.yacc()
+        else:
+            self.__parser = yacc.yacc(debug=False, write_tables=False)
 
     def parse(self, text):
         return self.__parser.parse(
@@ -311,17 +318,13 @@ class TagParser(object):
             lexer=lex.lex()
         )
 
-if __name__ == '__main__':
-    # Build the parser
-    parser = TagParser()
 
-    # s = '%div.hello.goodbye#yoyoyo(title="hello", '
-    # 'onclick="a = 1; item_clicked(a, b)") what is up?'
-    s = (
-        '%div(data-id = 1 + 1 + "asdfasdf,()")'
-        'asdfasdf""wqwierja,lasdf'
-    )
+def _debug_parse(s):
+    parser = TagParser(debug=True)
+    print(' ==== debug begin ==== ')
+
     print(s)
+
     lexer = lex.lex()
     lexer.input(s)
     for tok in lexer:
@@ -331,19 +334,39 @@ if __name__ == '__main__':
             )
         )
 
+    print(parser.parse(s))
+
+    print(' ==== debug end ==== ')
+    print('')
+
+if __name__ == '__main__':
+    # s = '%div.hello.goodbye#yoyoyo(title="hello", '
+    # 'onclick="a = 1; item_clicked(a, b)") what is up?'
+    s = (
+        '%div(data-id = 1 + 1 + "asdfasdf,()")'
+        ' asdfasdf""wqwierja,lasdf'
+    )
+    _debug_parse(s)
+
     s = (
         '%div.hello.goodbye#yoyoyo'
         '(title="hello", '
         'onclick="a = 1,b = 2,c = 3;item_clicked(a, b)")'
     )
-    print(parser.parse(s))
+    _debug_parse(s)
 
     s = (
         '%div.hello.goodbye#yoyoyo'
         '(title="hello", onclick="a = 1,b = 2,c = 3;item_clicked(a, b)",'
         ' data-value= 1 + 1)'
     )
-    print(parser.parse(s))
+    _debug_parse(s)
 
     s = '%div(title="hello"'
-    print(parser.parse(s))
+    _debug_parse(s)
+
+    s = '%input/'
+    _debug_parse(s)
+
+    s = '%input(name="username")/'
+    _debug_parse(s)

@@ -103,6 +103,13 @@ class Tag(LineItemBase):
             for attr in tag_attrs[1]:
                 attrs.append((attr[1], attr[2][1]))
 
+        tag_text = self.__parse_tree[3]
+        self_closing = False
+
+        if tag_text == '/':  # self-closing
+            tag_text = None
+            self_closing = True
+
         if attrs:
             env.writeline("buffer.write('<%s')" % tag_name)
             for key, val in attrs:
@@ -110,16 +117,24 @@ class Tag(LineItemBase):
                 env.writeline(
                     '''buffer.write('"' + str(%s) + '"')''' % val
                 )
-            env.writeline("buffer.write('>')")
-        else:
-            env.writeline("buffer.write('<%s>')" % tag_name)
 
-        tag_text = self.__parse_tree[3]
+            if self_closing:
+                env.writeline("buffer.write(' />')")
+            else:
+                env.writeline("buffer.write('>')")
+        else:
+            if self_closing:
+                env.writeline("buffer.write('<%s />')" % tag_name)
+            else:
+                env.writeline("buffer.write('<%s>')" % tag_name)
+
         if tag_text:
             env.writeline("buffer.write(%s)" % tag_text)
 
         block.compile(env)
-        env.writeline("buffer.write('</%s>')" % tag_name)
+
+        if not self_closing:
+            env.writeline("buffer.write('</%s>')" % tag_name)
 
 
 class Block(object):
