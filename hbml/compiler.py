@@ -4,7 +4,7 @@ import uuid
 from enum import Enum
 
 from . import exceptions
-from .utils import memoized_property
+from .utils import memoized_property, html_escape
 from .parser.tag_parser import TagParser
 
 LineTypes = Enum(
@@ -51,6 +51,8 @@ class SourceLine(object):
             source = self.__source + block.pop_firstline().source.strip()
             line = SourceLine(source)
             return line.compile(block, env)
+        elif parse_result[0] == 'expression':
+            return Expression(parse_result).compile(block, env)
 
         raise exceptions.CompileError(
             'dont know how to compile type: %s' % repr(self)
@@ -127,6 +129,30 @@ class Tag(LineItemBase):
 
         if not self_closing:
             env.writeline("buffer.write('</%s>')" % tag_name)
+
+
+class Expression(LineItemBase):
+    def __init__(self, parse_tree):
+        self.__parse_tree = parse_tree
+
+    def compile(self, block, env):
+        expr_type, expr_body = self.__parse_tree[1:]
+
+        if expr_type == 'EXPR_FLAG':
+            env.writeline(self.__parse_tree[2])
+            env.indent()
+            block.compile(env)
+            env.unindent()
+        elif expr_type == 'ECHO_FLAG':
+            env.writeline(
+                'buffer.write(str(%s))' % expr_body
+            )
+        elif expr_type == 'ESCAPE_ECHO_FLAG':
+            env.writeline(
+                'buffer.write(escape(str(%s)))' % expr_body
+            )
+        else:
+            raise ValueError('unknow expr type: %s' % expr_type)
 
 
 class Block(object):
@@ -207,6 +233,8 @@ class CompileWrapper(object):
         exec_env = {
             '__builtins__': {},
             'str': str,
+            'range': range,
+            'escape': html_escape,
         }
         exec(function_code, exec_env)
         return exec_env[function_name]

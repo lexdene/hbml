@@ -11,6 +11,7 @@ states = (
     ('tagattrval', _EXCLUSIVE),
     ('tagattrvalbrace', _EXCLUSIVE),
     ('tagtail', _EXCLUSIVE),
+    ('expression', _EXCLUSIVE),
 )
 
 # List of token names.
@@ -27,6 +28,10 @@ tokens = (
     'UNKNOWN',
     'EQUAL',
     'PLAINTEXT',
+    'EXPR_FLAG',
+    'ECHO_FLAG',
+    'ESCAPE_ECHO_FLAG',
+    'EXPR',
 )
 
 # Regular expression rules for simple tokens
@@ -35,6 +40,7 @@ t_tagattrs_COMMA = r'\,'
 t_tagattrs_ignore = r'[ ]+'
 t_tagattrval_STRING = r'"[^"]*"'
 t_tagtail_PLAINTEXT = r'.+'
+t_expression_EXPR = r'.+'
 
 
 def t_tag(t):
@@ -69,7 +75,7 @@ def t_tagbrief_error(t):
     raise ValueError('tagbrief error: %s' % repr(t))
 
 
-def t_INITIAL_OPEN_BRACE(t):
+def t_OPEN_BRACE(t):
     r'\('
     t.lexer.push_state('tagattrs')
     t.type = 'OPEN_BRACE'
@@ -168,6 +174,34 @@ def t_tagtail_error(t):
     raise ValueError('t_tagtail_error: %s' % repr(t))
 
 
+def t_EXPR_FLAG(t):
+    '-\ '
+    t.lexer.push_state('expression')
+
+    t.type = 'EXPR_FLAG'
+    return t
+
+
+def t_ECHO_FLAG(t):
+    '=\ '
+    t.lexer.push_state('expression')
+
+    t.type = 'ECHO_FLAG'
+    return t
+
+
+def t_ESCAPE_ECHO_FLAG(t):
+    '=%\ '
+    t.lexer.push_state('expression')
+
+    t.type = 'ESCAPE_ECHO_FLAG'
+    return t
+
+
+def t_expression_error(t):
+    raise ValueError(repr(t))
+
+
 # Error handling rule
 def t_error(t):
     raise ValueError('t_error: %s' % repr(t))
@@ -178,6 +212,7 @@ def p_first_rule(p):
     '''
         first_rule : tag
                    | unterminated_tag
+                   | expression
     '''
     p[0] = p[1]
 
@@ -298,6 +333,15 @@ def p_tag_without_terminate(p):
                          | tag_brief_part OPEN_BRACE tag_attrs COMMA empty
     '''
     p[0] = ('unterminated_tag', p[1], p[3])
+
+
+def p_expression(p):
+    '''
+        expression : EXPR_FLAG EXPR
+                   | ECHO_FLAG EXPR
+                   | ESCAPE_ECHO_FLAG EXPR
+    '''
+    p[0] = ('expression', p.slice[1].type, p[2])
 
 
 # Error rule for syntax errors
