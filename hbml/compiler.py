@@ -7,14 +7,6 @@ from . import exceptions
 from .utils import memoized_property
 from .parser.tag_parser import TagParser
 
-_RE_HBML_COMMENT = re.compile(r'^/-')
-_RE_TAG = re.compile(
-    r'^((%[a-z0-9]+)|(\.[a-zA-Z0-9_-]+)|(#[a-zA-Z0-9_-]+))+'
-)
-_RE_TAG_NAME = re.compile(r'%([a-z0-9]+)')
-_RE_TAG_CLASS_NAME = re.compile(r'\.([a-z0-9]+)')
-_RE_TAG_ID = re.compile(r'#([a-z0-9]+)')
-
 LineTypes = Enum(
     'LineTypes',
     'TAG TEXT EXPRESSION COMMENT EMPTY',
@@ -158,10 +150,16 @@ class Block(object):
             indent_width = env.options['indent_width']
             for s in self.__source_lines:
                 if s.is_header_line():
+                    if _header is not None:
+                        self.__sub_blocks.append(BlockWithHeader(
+                            _header, Block(_sub_lines)
+                        ))
+
                     _header = s
                     _sub_lines = []
                 else:
                     _sub_lines.append(s.unindent(indent_width))
+
             if _header is not None:
                 self.__sub_blocks.append(BlockWithHeader(
                     _header, Block(_sub_lines)
