@@ -1,1 +1,1 @@
-python3 -m tests.main --nocapture
+python3 -m unittest discover -v tests/ '*_test.py'
