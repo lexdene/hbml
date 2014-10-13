@@ -21,19 +21,20 @@ class TemplateTestCase(unittest.TestCase):
             filename, extname = os.path.splitext(filename)
 
             if extname == '.hbml':
-                self.assertEqual(
-                    _file_content(
-                        os.path.join(
-                            dirpath,
-                            filename + '.html'
-                        )
-                    ),
-                    hbml.compile(
+                with self.subTest(filename=filename):
+                    self.assertEqual(
                         _file_content(
                             os.path.join(
                                 dirpath,
-                                filename + '.hbml'
+                                filename + '.html'
                             )
-                        )
-                    ) + "\n"
-                )
+                        ),
+                        hbml.compile(
+                            _file_content(
+                                os.path.join(
+                                    dirpath,
+                                    filename + '.hbml'
+                                )
+                            )
+                        ) + "\n"
+                    )
