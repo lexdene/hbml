@@ -184,16 +184,17 @@ class Expression(LineItemBase):
 class Block(object):
     '''
         a source block.
-        contains a list of BlockWithHeader
+        contains a list of source line
     '''
     def __init__(self, source_lines):
         self.__source_lines = source_lines
 
         # caches
-        self.__sub_blocks = None  # a list of BlockWithHeader
+        self.__sub_blocks = None
 
     def compile(self, env):
         if self.__sub_blocks is None:
+            # __sub_blocks is a list of tuple
             self.__sub_blocks = []
 
             _header = None
@@ -205,7 +206,7 @@ class Block(object):
             for s in self.__source_lines:
                 if s.is_header_line():
                     if _header is not None:
-                        self.__sub_blocks.append(BlockWithHeader(
+                        self.__sub_blocks.append((
                             _header, Block(_sub_lines)
                         ))
 
@@ -215,13 +216,13 @@ class Block(object):
                     _sub_lines.append(s.unindent(indent_width))
 
             if _header is not None:
-                self.__sub_blocks.append(BlockWithHeader(
+                self.__sub_blocks.append((
                     _header, Block(_sub_lines)
                 ))
 
         # 递归调用子block的compile方法
-        for s in self.__sub_blocks:
-            s.compile(env)
+        for header, block in self.__sub_blocks:
+            header.compile(block, env)
 
     def pop_firstline(self):
         '删除并返回第一行'
@@ -230,16 +231,6 @@ class Block(object):
     def __str__(self):
         'for debug'
         return str(self.__source_lines)
-
-
-class BlockWithHeader(object):
-    '''block with one header'''
-    def __init__(self, header, block):
-        self._header = header
-        self._block = block
-
-    def compile(self, env):
-        self._header.compile(self._block, env)
 
 
 class CompileWrapper(object):
