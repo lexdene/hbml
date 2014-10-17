@@ -29,12 +29,17 @@ class SourceLine(object):
             没有缩进的行叫header line
             目前只考虑使用空格缩进
         '''
+        if len(self.__source) == 0:
+            return False
         return not self.__source.startswith(' ')
 
     def unindent(self, width):
         '''
             取消缩进 :width 个空格
         '''
+        if len(self.__source) == 0:
+            return self
+
         if not self.__source.startswith(' ' * width):
             raise exceptions.CompileError('can not unindent %d: %s' % (
                 width,
@@ -44,6 +49,10 @@ class SourceLine(object):
         return SourceLine(self.__source[width:])
 
     def compile(self, block, env):
+        # 空行不做处理
+        if len(self.__source) == 0:
+            return
+
         # 调用TagParser()进行语法分析
         parse_result = env.tag_parser.parse(self.__source)
 
@@ -80,6 +89,7 @@ class Tag(LineItemBase):
         tag_name = self._DEFAULT_TAG_NAME
         class_names = []
         _id = None
+        _filter = None
 
         attrs = []
 
@@ -88,6 +98,7 @@ class Tag(LineItemBase):
             # # 表示id
             # % 表示标签名
             # . 表示class
+            # : 表示filter
             if '#' == brief[1]:
                 _id = brief[2]
             elif '%' == brief[1]:
@@ -95,6 +106,8 @@ class Tag(LineItemBase):
             elif '.' == brief[1]:
                 # 一个标签可以有多个class
                 class_names.append(brief[2])
+            elif ':' == brief[1]:
+                _filter = brief[2]
 
         # 将id和class names拼装成和tag_attrs相同的格式
         if _id:
@@ -140,9 +153,13 @@ class Tag(LineItemBase):
         if tag_text:
             env.writeline("buffer.write(%s)" % tag_text)
 
-        # 编译子元素
-        # 这是个递归
-        block.compile(env)
+        if _filter is None:
+            # 编译子元素
+            # 这是个递归
+            block.compile(env)
+        else:
+            filter_function = _FILTER_FUNCTION_MAP[_filter]
+            filter_function(block, env)
 
         # 自闭合标签没有结尾标记
         # 见: tests/templates/self_closing_tag.hbml
@@ -228,6 +245,12 @@ class Block(object):
         '删除并返回第一行'
         return self.__source_lines.pop(0)
 
+    @memoized_property
+    def source(self):
+        return "\n".join((
+            s.source for s in self.__source_lines
+        ))
+
     def __str__(self):
         'for debug'
         return str(self.__source_lines)
@@ -309,7 +332,7 @@ class CompileWrapper(object):
 def _source_to_source_lines(source):
     '将源码拆分成行, 并将每一行实例化为一个SourceLine对象'
     return [
-        SourceLine(s) for s in source.split('\n') if len(s) > 0
+        SourceLine(s) for s in source.split('\n')
     ]
 
 
@@ -330,6 +353,17 @@ def _fill_options(options):
             result[k] = v
 
     return result
+
+
+def _filter_plain(block, env):
+    '这个filter表示将内容不作处理原样输出'
+    env.writeline('buffer.write("\\n")')
+    env.writeline("buffer.write(%s)" % repr(block.source))
+
+
+_FILTER_FUNCTION_MAP = {
+    'plain': _filter_plain,
+}
 
 
 def compile(source, variables=None, **options):

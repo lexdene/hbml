@@ -23,6 +23,7 @@ tokens = (
     'CLOSE_BRACE',
     'COMMA',
     'VIRGULE',
+    'COLON',
     'KEYWORD',
     'STRING',
     'UNKNOWN',
@@ -44,13 +45,14 @@ t_expression_EXPR = r'.+'
 
 
 def t_tag(t):
-    r'\#|%|\.'
+    r'\#|%|\.|\:'
     t.lexer.push_state('tagbrief')
 
     type_map = {
         '%': 'PERCENTAGE',
         '.': 'DOT',
         '#': 'SHARP',
+        ':': 'COLON',
     }
 
     t.type = type_map[t.value]
@@ -282,6 +284,7 @@ def p_tag_brief_item(p):
         tag_brief_item : PERCENTAGE KEYWORD
                        | DOT KEYWORD
                        | SHARP KEYWORD
+                       | COLON KEYWORD
     '''
     p[0] = ('tag_brief_item', p[1], p[2])
 
