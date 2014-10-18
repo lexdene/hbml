@@ -388,3 +388,9 @@ def compile(source, variables=None, **options):
     # 目前只是单纯地返回编译结果字符串
     # 更多功能尚在开发中
     return buffer.getvalue()
+
+
+def compile_file(path, variables=None, **options):
+    'compile from a file'
+    with open(path, 'r') as f:
+        return compile(f.read(), variables, **options)
