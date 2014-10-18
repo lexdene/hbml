@@ -78,3 +78,19 @@ class TagTextTestCase(unittest.TestCase):
                 "  %h2 hello"
             ))
         )
+
+
+class VariablesTestCase(unittest.TestCase):
+    def testVariables(self):
+        self.assertEqual(
+            '<div data-length="5">HELLO</div>',
+            hbml.compile(
+                (
+                    "%div(data-length=len(content))\n"
+                    "  = content.upper()"
+                ),
+                dict(
+                    content="hello"
+                )
+            )
+        )

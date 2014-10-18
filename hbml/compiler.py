@@ -283,6 +283,10 @@ class CompileWrapper(object):
         self.writeline('def %s(buffer, **variables):' % function_name)
         # 函数体之前要缩进一下
         self.indent()
+        # 将variables展开为变量
+        # TODO: 总感觉这样实现不够优雅
+        # 有空可以看看jinja2是怎么实现变量展开的
+        self.writeline('globals().update(variables)')
         # 编译block
         self.__block.compile(self)
 
@@ -291,11 +295,8 @@ class CompileWrapper(object):
         function_code = self.__buffer.getvalue()
 
         # 函数执行环境
-        # 为了防止注入攻击，函数执行环境要封闭起来
+        # TODO: 为了防止注入攻击，函数执行环境要封闭起来
         exec_env = {
-            '__builtins__': {},
-            'str': str,
-            'range': range,
             'escape': html_escape,
         }
 
