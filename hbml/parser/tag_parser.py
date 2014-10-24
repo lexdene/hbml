@@ -66,7 +66,7 @@ def t_space(t):
 
 
 def t_tagbrief_keyword(t):
-    r'[a-zA-Z_][a-zA-Z0-9_-]+'
+    r'[a-zA-Z_][a-zA-Z0-9_-]*'
     t.lexer.pop_state()
 
     t.type = 'KEYWORD'
