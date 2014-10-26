@@ -68,10 +68,18 @@ class SourceLine(object):
         elif parse_result[0] == 'expression':
             # Python语句
             return Expression(parse_result).compile(block, env)
+        elif parse_result[0] == 'plaintext':
+            # 纯文本
+            return env.writeline(
+                'buffer.write(%s)' % repr(parse_result[1])
+            )
         else:
             # 发生错误
             raise exceptions.CompileError(
-                'dont know how to compile type: %s' % repr(self)
+                'dont know how to compile type: %s, %s' % (
+                    repr(self),
+                    parse_result
+                )
             )
 
 

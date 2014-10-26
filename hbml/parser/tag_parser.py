@@ -6,12 +6,15 @@ _INCLUSIVE = 'inclusive'
 
 # TODO: rewrite by enum
 states = (
+    ('tag', _EXCLUSIVE),
+    ('expression', _EXCLUSIVE),
+
+    # sub states of tag
     ('tagbrief', _EXCLUSIVE),
     ('tagattrs', _EXCLUSIVE),
     ('tagattrval', _EXCLUSIVE),
     ('tagattrvalbrace', _EXCLUSIVE),
     ('tagtail', _EXCLUSIVE),
-    ('expression', _EXCLUSIVE),
 )
 
 # List of token names.
@@ -36,7 +39,7 @@ tokens = (
 )
 
 # Regular expression rules for simple tokens
-t_VIRGULE = r'/'
+t_tag_VIRGULE = r'/'
 t_tagattrs_COMMA = r'\,'
 t_tagattrs_ignore = r'[ ]+'
 t_tagattrval_STRING = r'"[^"]*"'
@@ -44,8 +47,11 @@ t_tagtail_PLAINTEXT = r'.+'
 t_expression_EXPR = r'.+'
 
 
-def t_tag(t):
+def t_INITIAL_tag_begintag(t):
     r'\#|%|\.|\:'
+    if t.lexer.current_state() == 'INITIAL':
+        t.lexer.push_state('tag')
+
     t.lexer.push_state('tagbrief')
 
     type_map = {
@@ -59,10 +65,14 @@ def t_tag(t):
     return t
 
 
-def t_space(t):
+def t_tag_space(t):
     r'\ '
 
     t.lexer.push_state('tagtail')
+
+
+def t_tag_error(t):
+    raise ValueError('tag error: %s' % repr(t))
 
 
 def t_tagbrief_keyword(t):
@@ -77,7 +87,7 @@ def t_tagbrief_error(t):
     raise ValueError('tagbrief error: %s' % repr(t))
 
 
-def t_OPEN_BRACE(t):
+def t_tag_OPEN_BRACE(t):
     r'\('
     t.lexer.push_state('tagattrs')
     t.type = 'OPEN_BRACE'
@@ -204,6 +214,12 @@ def t_expression_error(t):
     raise ValueError(repr(t))
 
 
+def t_plaintext(t):
+    r'.+'
+    t.type = 'PLAINTEXT'
+    return t
+
+
 # Error handling rule
 def t_error(t):
     raise ValueError('t_error: %s' % repr(t))
@@ -215,6 +231,7 @@ def p_first_rule(p):
         first_rule : tag
                    | unterminated_tag
                    | expression
+                   | plaintext
     '''
     p[0] = p[1]
 
@@ -345,6 +362,13 @@ def p_expression(p):
                    | ESCAPE_ECHO_FLAG EXPR
     '''
     p[0] = ('expression', p.slice[1].type, p[2])
+
+
+def p_plaintext(p):
+    '''
+        plaintext : PLAINTEXT
+    '''
+    p[0] = ('plaintext', p[1])
 
 
 # Error rule for syntax errors
