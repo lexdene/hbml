@@ -400,5 +400,5 @@ def compile(source, variables=None, **options):
 
 def compile_file(path, variables=None, **options):
     'compile from a file'
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
         return compile(f.read(), variables, **options)
