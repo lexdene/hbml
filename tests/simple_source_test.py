@@ -22,6 +22,22 @@ class TagAttrsTestCase(unittest.TestCase):
             )
         )
 
+    def testStringAttr(self):
+        self.assertEqual(
+            '<div title="hello"></div>',
+            hbml.compile(
+                '%div(title="hello")'
+            )
+        )
+
+    def testMultiStringAttr(self):
+        self.assertEqual(
+            '<div title="hello" alt="yoyo"></div>',
+            hbml.compile(
+                '%div(title="hello", alt="yoyo")'
+            )
+        )
+
     def testInBracketAttr(self):
         self.assertEqual(
             (

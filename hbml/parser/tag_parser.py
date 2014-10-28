@@ -14,6 +14,7 @@ states = (
     ('tagattrs', _EXCLUSIVE),
     ('tagattrval', _EXCLUSIVE),
     ('tagattrvalbrace', _EXCLUSIVE),
+    ('tagattrvalstring', _EXCLUSIVE),
     ('tagtail', _EXCLUSIVE),
 )
 
@@ -28,8 +29,6 @@ tokens = (
     'VIRGULE',
     'COLON',
     'KEYWORD',
-    'STRING',
-    'UNKNOWN',
     'EQUAL',
     'PLAINTEXT',
     'EXPR_FLAG',
@@ -42,7 +41,6 @@ tokens = (
 t_tag_VIRGULE = r'/'
 t_tagattrs_COMMA = r'\,'
 t_tagattrs_ignore = r'[ ]+'
-t_tagattrval_STRING = r'"[^"]*"'
 t_tagtail_PLAINTEXT = r'.+'
 t_expression_EXPR = r'.+'
 
@@ -112,6 +110,9 @@ def t_tagattrs_CLOSE_BRACE(t):
 
 def t_tagattrs_EQUAL(t):
     r'='
+
+    t.lexer.attrval_start = t.lexer.lexpos
+
     t.lexer.push_state('tagattrval')
 
     t.type = 'EQUAL'
@@ -127,7 +128,16 @@ def t_tagattrval_COMMA(t):
 
     t.lexer.pop_state()
 
-    t.type = 'COMMA'
+    t.value = t.lexer.lexdata[
+        t.lexer.attrval_start:t.lexer.lexpos - 1
+    ]
+    t.type = "EXPR"
+
+    t.lexer.attrval_start = None
+
+    # move backward to pop close_brace
+    t.lexer.lexpos -= 1
+
     return t
 
 
@@ -136,25 +146,33 @@ def t_tagattrval_OPEN_BRACE(t):
 
     t.lexer.push_state('tagattrvalbrace')
 
-    t.type = 'UNKNOWN'
-    return t
-
 
 def t_tagattrval_CLOSE_BRACE(t):
     r'\)'
 
     t.lexer.pop_state()
-    t.lexer.pop_state()
 
-    t.type = 'CLOSE_BRACE'
+    t.value = t.lexer.lexdata[
+        t.lexer.attrval_start:t.lexer.lexpos - 1
+    ]
+    t.type = "EXPR"
+
+    t.lexer.attrval_start = None
+
+    # move backward to pop close_brace
+    t.lexer.lexpos -= 1
+
     return t
+
+
+def t_tagattrval_STRING(t):
+    r'"'
+
+    t.lexer.push_state('tagattrvalstring')
 
 
 def t_tagattrval_error(t):
-    t.type = 'UNKNOWN'
-    t.value = t.value[0]
-    t.lexer.skip(1)
-    return t
+    raise ValueError('lex error: %s' % repr(t))
 
 
 def t_tagattrvalbrace_OPEN_BRACE(t):
@@ -162,24 +180,36 @@ def t_tagattrvalbrace_OPEN_BRACE(t):
 
     t.lexer.push_state('tagattrvalbrace')
 
-    t.type = 'UNKNOWN'
-    return t
-
 
 def t_tagattrvalbrace_CLOSE_BRACE(t):
     r'\)'
 
     t.lexer.pop_state()
 
-    t.type = 'UNKNOWN'
-    return t
-
 
 def t_tagattrvalbrace_error(t):
-    t.type = 'UNKNOWN'
-    t.value = t.value[0]
+    raise ValueError('lex error: %s' % repr(t))
+
+
+def t_tagattrvalstring_escape(t):
+    r'\\'
+
     t.lexer.skip(1)
-    return t
+
+
+def t_tagattrvalstring_end(t):
+    r'"'
+
+    t.lexer.pop_state()
+
+
+def t_tagattrvalstring_error(t):
+    raise ValueError('lex error: %s' % repr(t))
+
+
+def t_tagattrval_tagattrvalbrace_tagattrvalstring_expr(t):
+    r'.'
+    pass
 
 
 def t_tagtail_error(t):
@@ -322,24 +352,9 @@ def p_tag_attrs_with_one_item(p):
 
 def p_tag_attr_item(p):
     '''
-        tag_attr_item : KEYWORD EQUAL expr
+        tag_attr_item : KEYWORD EQUAL EXPR
     '''
     p[0] = ('tag_attr_item', p[1], p[3])
-
-
-def p_expr_by_string(p):
-    '''
-        expr : STRING
-             | UNKNOWN
-             | expr STRING
-             | expr UNKNOWN
-    '''
-    if len(p) == 2:
-        p[0] = ('expr', p[1])
-    elif len(p) == 3:
-        p[0] = ('expr', p[1][1] + p[2])
-    else:
-        raise ValueError('len is %d' % len(p))
 
 
 def p_empty(p):
@@ -384,31 +399,30 @@ class TagParser(object):
             self.__parser = yacc.yacc(debug=False, write_tables=False)
 
     def parse(self, text):
+        # self._debug_parse_tokens(text)
+
         return self.__parser.parse(
             text,
             lexer=lex.lex()
         )
 
+    def _debug_parse_tokens(self, s):
+        print(' ==== debug begin ==== ')
 
-def _debug_parse(s):
-    parser = TagParser(debug=True)
-    print(' ==== debug begin ==== ')
+        print(s)
+        print(repr(s))
 
-    print(s)
-
-    lexer = lex.lex()
-    lexer.input(s)
-    for tok in lexer:
-        print(
-            '%15s, %40s %3d %3d' % (
-                tok.type, repr(tok.value), tok.lineno, tok.lexpos
+        lexer = lex.lex()
+        lexer.input(s)
+        for tok in lexer:
+            print(
+                '%15s, %40s %3d %3d' % (
+                    tok.type, repr(tok.value), tok.lineno, tok.lexpos
+                )
             )
-        )
 
-    print(parser.parse(s))
-
-    print(' ==== debug end ==== ')
-    print('')
+        print(' ==== debug end ==== ')
+        print('')
 
 if __name__ == '__main__':
     # s = '%div.hello.goodbye#yoyoyo(title="hello", '

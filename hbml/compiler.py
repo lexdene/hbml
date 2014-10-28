@@ -129,7 +129,7 @@ class Tag(LineItemBase):
         tag_attrs = self.__parse_tree[2]
         if tag_attrs:
             for attr in tag_attrs[1]:
-                attrs.append((attr[1], attr[2][1]))
+                attrs.append((attr[1], attr[2]))
 
         tag_text = self.__parse_tree[3]
         self_closing = False
@@ -144,9 +144,11 @@ class Tag(LineItemBase):
             env.writeline("buffer.write('<%s')" % tag_name)
             for key, val in attrs:
                 env.writeline("buffer.write(' %s=')" % key)
+                env.writeline('''buffer.write('"')''')
                 env.writeline(
-                    '''buffer.write('"' + str(%s) + '"')''' % val
+                    r'''buffer.write(str(%s).replace('"', r'\"'))''' % val
                 )
+                env.writeline('''buffer.write('"')''')
 
             if self_closing:
                 env.writeline("buffer.write(' />')")
