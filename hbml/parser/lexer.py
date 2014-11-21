@@ -293,6 +293,9 @@ class HbmlLexer:
                 t.value = t.lexer.lexdata[
                     begin_token.lexpos + 1:t.lexpos
                 ]
+
+                self.filter_begin_token = None
+
                 return t
         else:
             self.filter_begin_token = t

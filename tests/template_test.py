@@ -35,6 +35,25 @@ class TemplateTestCase(unittest.TestCase):
             ) + "\n"
         )
 
+    def _test_uncompress_file(self, filename):
+        self.assertEqual(
+            _file_content(
+                os.path.join(
+                    DIRPATH,
+                    filename + '.uncompress.html'
+                )
+            ),
+            hbml.compile(
+                _file_content(
+                    os.path.join(
+                        DIRPATH,
+                        filename + '.hbml'
+                    )
+                ),
+                compress_output=False
+            )
+        )
+
     def testTemplates(self):
         for filename in os.listdir(DIRPATH):
             filename, extname = os.path.splitext(filename)
@@ -42,3 +61,4 @@ class TemplateTestCase(unittest.TestCase):
             if extname == '.hbml':
                 with self.subTest(filename=filename):
                     self._test_file(filename)
+                    self._test_uncompress_file(filename)

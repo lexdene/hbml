@@ -52,6 +52,10 @@ class Tag(LangStructBase):
             tag_text = None
             self_closing = True
 
+        # output indent
+        if not env.options['compress_output']:
+            env.writeline("buffer.write('%s')" % (' ' * env.output_indent))
+
         # 输出编译结果
         if attrs:
             env.writeline("buffer.write('<%s')" % tag_name)
@@ -77,6 +81,10 @@ class Tag(LangStructBase):
             env.writeline("buffer.write(%s)" % tag_text)
 
         if block:
+            if not env.options['compress_output']:
+                env.writeline("buffer.write('\\n')")
+                env.indent_output()
+
             if _filter is None:
                 # 编译子元素
                 # 这是个递归
@@ -88,7 +96,14 @@ class Tag(LangStructBase):
         # 自闭合标签没有结尾标记
         # 见: tests/templates/self_closing_tag.hbml
         if not self_closing:
+            if block and not env.options['compress_output']:
+                env.outdent_output()
+                env.writeline("buffer.write('%s')" % (' ' * env.output_indent))
+
             env.writeline("buffer.write('</%s>')" % tag_name)
+
+        if not env.options['compress_output']:
+            env.writeline("buffer.write('\\n')")
 
 
 class Expression(LangStructBase):
@@ -100,20 +115,32 @@ class Expression(LangStructBase):
             env.writeline(self._parse_tree[2])
             env.indent()
             block.compile(env)
-            env.unindent()
+            env.outdent()
         elif expr_type == 'ECHO_FLAG':
             # ECHO_FLAG 表示这是个Python表达式
             # 并且输出表达式的值
+            if not env.options['compress_output']:
+                env.writeline("buffer.write('%s')" % (' ' * env.output_indent))
+
             env.writeline(
                 'buffer.write(str(%s))' % expr_body
             )
+
+            if not env.options['compress_output']:
+                env.writeline("buffer.write('\\n')")
         elif expr_type == 'ESCAPE_ECHO_FLAG':
             # ESCAPE_ECHO_FLAG 表示这是个Python表达式
             # 输出表达式的值
             # 并且要html转义
+            if not env.options['compress_output']:
+                env.writeline("buffer.write('%s')" % (' ' * env.output_indent))
+
             env.writeline(
                 'buffer.write(escape(str(%s)))' % expr_body
             )
+
+            if not env.options['compress_output']:
+                env.writeline("buffer.write('\\n')")
         else:
             # 未知类型，报错
             raise ValueError('unknow expr type: %s' % expr_type)
@@ -121,9 +148,15 @@ class Expression(LangStructBase):
 
 class PlainText(LangStructBase):
     def compile(self, block, env):
+        if not env.options['compress_output']:
+            env.writeline("buffer.write('%s')" % (' ' * env.output_indent))
+
         env.writeline(
             'buffer.write(%s)' % repr(self._parse_tree[1])
         )
+
+        if not env.options['compress_output']:
+            env.writeline("buffer.write('\\n')")
 
     @property
     def source(self):
@@ -184,9 +217,9 @@ def create(parse_tree):
 
 def _filter_plain(block, env):
     '这个filter表示将内容不作处理原样输出'
-    env.writeline('buffer.write("\\n")')
     env.writeline("buffer.write(%s)" % repr(block.source))
-    env.writeline('buffer.write("\\n")')
+    if not env.options['compress_output']:
+        env.writeline("buffer.write('\\n')")
 
 
 _FILTER_FUNCTION_MAP = {

@@ -1,0 +1,16 @@
+%html(lang="en")
+  %head
+    %title hbml page
+    %script:plain(type='text/javascript')
+      if (foo) {
+         bar(1 + 5)
+      }
+  %body
+    %h1 hbml - a html template by Python
+    #container.col
+      - for i in range(3):
+        %div(data-id = i)
+          = i + 1
+      %p:plain
+        hbml is a simple templating
+        language writen by Python

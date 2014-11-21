@@ -28,6 +28,7 @@ class CompileWrapper(object):
         self.__clean_source()
 
         self.__indent_width = 0
+        self.__output_indent_width = 0
         self.__buffer = io.StringIO()
 
         # 使用uuid生成一个唯一标识的函数名
@@ -78,7 +79,7 @@ class CompileWrapper(object):
         '增加一级缩进'
         self.__indent_width += self.options['indent_width']
 
-    def unindent(self):
+    def outdent(self):
         '''
             减少一级缩进
             如果结果小于0, 就报错
@@ -86,16 +87,29 @@ class CompileWrapper(object):
         self.__indent_width -= self.options['indent_width']
 
         if self.__indent_width < 0:
-            raise exceptions.CompileError('cannot unindent less than 0')
+            raise exceptions.CompileError('cannot outdent less than 0')
+
+    @property
+    def output_indent(self):
+        return self.__output_indent_width
+
+    def indent_output(self):
+        self.__output_indent_width += self.options['indent_width']
+
+    def outdent_output(self):
+        self.__output_indent_width -= self.options['indent_width']
+
+        if self.__output_indent_width < 0:
+            raise exceptions.CompileError('cannot outdent less than 0')
 
     def __clean_source(self):
         if not self.__source.endswith('\n'):
             self.__source = self.__source + '\n'
 
 
-# 好吧，目前的默认选项只有1个
 _DEFAULT_OPTIONS = dict(
-    indent_width=2
+    indent_width=2,
+    compress_output=True
 )
 
 
