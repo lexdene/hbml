@@ -1,4 +1,3 @@
-import re
 import io
 import uuid
 
@@ -17,10 +16,6 @@ class CompileWrapper(object):
         self.__source = source
         self.options = options
         self.__buffer = None
-
-    @memoized_property
-    def tag_parser(self):
-        return Parser()
 
     def compile(self):
         '将hbml源代码编译成一个Python函数'
@@ -46,7 +41,9 @@ class CompileWrapper(object):
         self.writeline('globals().update(variables)')
 
         # 编译block
-        parse_result = self.tag_parser.parse(self.__source)
+        parser = Parser()
+        parse_result = parser.parse(self.__source)
+
         lang = lang_struct.create(parse_result)
         lang.compile(self)
 
@@ -126,7 +123,7 @@ def _fill_options(options):
     return result
 
 
-def compile(source, variables=None, **options):
+def compile(source, variables=None, output=None, **options):
     options = _fill_options(options)
 
     if variables is None:
@@ -137,14 +134,15 @@ def compile(source, variables=None, **options):
     # 中间的编译结果是一个Python函数
     template_function = env.compile()
 
-    # 输出到StringIO是为了应对编译到文件/流/下一步处理等多种情况
-    buffer = io.StringIO()
-    # 执行编译出来的函数，传入外部变量
-    template_function(buffer, **variables)
+    if output:
+        template_function(output, **variables)
+    else:
+        buffer = io.StringIO()
+        # 执行编译出来的函数，传入外部变量
+        template_function(buffer, **variables)
 
-    # 目前只是单纯地返回编译结果字符串
-    # 更多功能尚在开发中
-    return buffer.getvalue()
+        # 如果未提供output，则单纯地返回编译结果字符串
+        return buffer.getvalue()
 
 
 def compile_file(path, variables=None, **options):
